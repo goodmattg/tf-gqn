@@ -130,9 +130,9 @@ class EagerDataReader(object):
 
     def __init__(
         self,
+        rootdir,
         dataset,
         context_size,
-        rootdir,
         mode="train",
         batch_size=1,
         num_epochs=1,
