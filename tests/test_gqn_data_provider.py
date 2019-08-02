@@ -22,17 +22,21 @@ CTX_SIZE = 5  # number of context (image, pose) pairs for a given query pose
 BATCH_SIZE = 2
 
 data_reader = EagerDataReader(
-    DATASET_ROOT_PATH, DATASET_NAME, CTX_SIZE, mode="train", batch_size=BATCH_SIZE
+    DATASET_ROOT_PATH,
+    DATASET_NAME,
+    CTX_SIZE,
+    mode=tf.estimator.ModeKeys.TRAIN,
+    batch_size=BATCH_SIZE,
 )
 
 sample = data_reader.dataset.take(1)
 
-for d in sample:
+for (features, labels) in sample:
     # print shapes of fetched objects
     print("Shapes of fetched tensors:")
-    print("Query camera poses: %s" % str(d.query.query_camera.shape))
-    print("Target images: %s" % str(d.target.shape))
-    print("Context camera poses: %s" % str(d.query.context.cameras.shape))
-    print("Context frames: %s" % str(d.query.context.frames.shape))
+    print("Query camera poses: %s" % str(features.query_camera.shape))
+    print("Target images: %s" % str(labels.shape))
+    print("Context camera poses: %s" % str(features.context.cameras.shape))
+    print("Context frames: %s" % str(features.context.frames.shape))
 
 print("TEST PASSED!")

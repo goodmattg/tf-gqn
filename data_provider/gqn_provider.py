@@ -26,7 +26,6 @@ TaskData = collections.namedtuple("TaskData", ["query", "target"])
 
 _NUM_CHANNELS = 3
 _NUM_RAW_CAMERA_PARAMS = 5
-_MODES = ("train", "test")
 
 _DATASETS = dict(
     jaco=DatasetInfo(
@@ -80,7 +79,14 @@ _DATASETS = dict(
 def _get_dataset_files(dateset_info, mode, rootdir):
     """Generates lists of files for a given dataset version."""
     basepath = dateset_info.basepath
-    base = os.path.join(rootdir, basepath, mode)
+
+    # Only here to address evaluation files in folder named 'test'
+    if mode is tf.estimator.ModeKeys.EVAL:
+        mode_str = "test"
+    else:
+        mode_str = mode
+
+    base = os.path.join(rootdir, basepath, mode_str)
 
     return [os.path.join(base, f) for f in os.listdir(base)]
 
@@ -133,7 +139,7 @@ class EagerDataReader(object):
         rootdir,
         dataset,
         context_size,
-        mode="train",
+        mode=tf.estimator.ModeKeys.TRAIN,
         batch_size=1,
         num_epochs=1,
         # Optionally reshape frames
@@ -152,13 +158,6 @@ class EagerDataReader(object):
 
         # Dataset description
         self._dataset_info = _DATASETS[dataset]
-
-        if mode not in _MODES:
-            raise ValueError(
-                "Unsupported mode {} requested. Supported modes are {}".format(
-                    mode, _MODES
-                )
-            )
 
         if context_size >= self._dataset_info.sequence_size:
             raise ValueError(
