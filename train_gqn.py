@@ -111,7 +111,7 @@ ARGPARSER.add_argument(
     help="How many parallel threads to run for data queuing.",
 )
 
-# TODO: this should be called dataset prefetch buffer
+# FIXME: this should be called dataset prefetch buffer
 ARGPARSER.add_argument(
     "--queue_buffer", type=int, default=4, help="How many batches to queue up."
 )
@@ -232,16 +232,6 @@ def main(unparsed_argv):
         buffer_size=ARGS.queue_buffer,
     ).dataset
 
-    # input_fn = lambda estimator_mode: gqn_input_fn(
-    #     dataset_name=ARGS.dataset,
-    #     root=ARGS.data_dir,
-    #     mode=estimator_mode,
-    #     context_size=gqn_config.CONTEXT_SIZE,
-    #     batch_size=ARGS.batch_size,
-    #     custom_frame_size=ARGS.img_size,
-    #     num_threads=ARGS.queue_threads,
-    #     buffer_size=ARGS.queue_buffer,
-    # )
     train_input = lambda: input_fn(estimator_mode=tf.estimator.ModeKeys.TRAIN)
     eval_input = lambda: input_fn(estimator_mode=tf.estimator.ModeKeys.EVAL)
 
@@ -253,10 +243,15 @@ def main(unparsed_argv):
 
     # optional initial evaluation
     if ARGS.initial_eval:
+        print("Performing initial evaluation.")
         eval_results = model.evaluate(input_fn=eval_input, hooks=[logging_hook])
+        import pdb; pdb.set_trace()
+        
+    return
 
     # main loop
     for _ in range(ARGS.train_epochs):
+        print("Performing GQN training.")
         model.train(input_fn=train_input, hooks=[logging_hook])
         eval_results = model.evaluate(input_fn=eval_input, hooks=[logging_hook])
 

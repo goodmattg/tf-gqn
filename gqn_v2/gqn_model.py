@@ -58,10 +58,7 @@ def _linear_lr_annealing(gqn_params: GQNConfig) -> tf.Tensor:
 # ---------- public model_fns returning EstimatorSpecs ----------
 
 
-def gqn_draw_model_fn(features, labels, mode, params):
-    import pdb
-
-    pdb.set_trace()
+def gqn_draw_model_fn(features, labels, mode, params) -> tf.estimator.EstimatorSpec:
     """
   Defines an tf.estimator.EstimatorSpec for the GQN model.
 
@@ -86,7 +83,7 @@ def gqn_draw_model_fn(features, labels, mode, params):
     ctx_size = params["gqn_params"].CONTEXT_SIZE
     seq_length = params["gqn_params"].SEQ_LENGTH
     # feature and label mapping according to gqn_input_fn
-    
+
     # FIXME: Warn changed these from features.query.* to features.*
     query_pose = features.query_camera
     context_poses = features.context.cameras
@@ -126,36 +123,27 @@ def gqn_draw_model_fn(features, labels, mode, params):
         for i in range(ctx_size):
             ctx_frames.append(context_frames[:, i])
             ctx_frames.append(white_vertical_bar)
-        tf.compat.v1.summary.image(
+        tf.summary.image(
             name="context_frames",
-            tensor=tf.concat(ctx_frames, axis=-2, name="context_grid"),
+            data=tf.concat(ctx_frames, axis=-2, name="context_grid"),
             max_outputs=1,
         )
         # target images
-        tf.compat.v1.summary.image(
-            name="target_frame", tensor=target_frame, max_outputs=1
-        )
+        tf.summary.image("target_frame", target_frame, max_outputs=1)
         # show inference results during training phase
         if mode == tf.estimator.ModeKeys.TRAIN:
-            tf.compat.v1.summary.scalar(
-                name="l2_reconstruction_train", tensor=l2_reconstruction[1]
-            )
-            tf.compat.v1.summary.image(
-                name="target_inference", tensor=mu_target, max_outputs=1
-            )
+            tf.summary.scalar("l2_reconstruction_train", l2_reconstruction[1])
+            tf.summary.image("target_inference", mu_target, max_outputs=1)
         # show generation results during evaluation phase
         if mode == tf.estimator.ModeKeys.EVAL:
-            tf.compat.v1.summary.scalar(
-                name="l2_reconstruction_eval", tensor=l2_reconstruction[1]
-            )
-            tf.compat.v1.summary.image(
-                name="target_generation", tensor=mu_target, max_outputs=1
-            )
+            tf.summary.scalar("l2_reconstruction_eval", l2_reconstruction[1])
+            tf.summary.image("target_generation", mu_target, max_outputs=1)
         # debug visualization of DRAW sequence
         draw_sequence = debug_canvas_image_mean(
             [ep_gqn["canvas_{}".format(i)] for i in range(seq_length)]
         )
-        tf.compat.v1.summary.image("draw_sequence", draw_sequence, max_outputs=1)
+        tf.summary.image("draw_sequence", draw_sequence, max_outputs=1)
+
     # predictions to make when deployed during test time
     if mode == tf.estimator.ModeKeys.PREDICT:
         predictions = {
@@ -164,6 +152,7 @@ def gqn_draw_model_fn(features, labels, mode, params):
             "target_prediction": mu_target,
             # 'target_image' : features.target,
         }
+
     # ELBO setup
     if mode == tf.estimator.ModeKeys.TRAIN:
         # collect intermediate endpoints
@@ -177,10 +166,9 @@ def gqn_draw_model_fn(features, labels, mode, params):
             mu_target, sigma_target, mu_q, sigma_q, mu_pi, sigma_pi, target_frame
         )
         if params["debug"]:
-            tf.compat.v1.summary.scalar(name="target_llh", tensor=ep_elbo["target_llh"])
-            tf.compat.v1.summary.scalar(
-                name="kl_regularizer", tensor=ep_elbo["kl_regularizer"]
-            )
+            tf.summary.scalar("target_llh", ep_elbo["target_llh"])
+            tf.summary.scalar("kl_regularizer", ep_elbo["kl_regularizer"])
+
     # optimization
     if mode == tf.estimator.ModeKeys.TRAIN:
         lr = _linear_lr_annealing(params["gqn_params"])
@@ -189,7 +177,8 @@ def gqn_draw_model_fn(features, labels, mode, params):
             loss=elbo, global_step=tf.compat.v1.train.get_global_step()
         )
         if params["debug"]:
-            tf.compat.v1.summary.scalar(name="learning_rate", tensor=lr)
+            tf.summary.scalar("learning_rate", lr)
+
     # evaluation metrics and summaries
     if mode == tf.estimator.ModeKeys.EVAL:
         eval_metric_ops = {
@@ -197,12 +186,15 @@ def gqn_draw_model_fn(features, labels, mode, params):
                 labels=target_frame, predictions=mu_target
             )
         }
+
         eval_summary_hook = tf.estimator.SummarySaverHook(
             save_steps=1,
             output_dir=os.path.join(params["model_dir"], "eval"),
-            summary_op=tf.compat.v1.summary.merge_all(),
+            summary_op=tf.compat.v1.summary.all_v2_summary_ops(),
         )
+
         eval_hooks = [eval_summary_hook]
+
     # create SpecSheet
     if mode == tf.estimator.ModeKeys.TRAIN:
         estimator_spec = tf.estimator.EstimatorSpec(
@@ -287,18 +279,16 @@ def gqn_draw_identity_model_fn(features, labels, mode, params):
     # write out image summaries in debug mode
     if params["debug"]:
         for i in range(_CONTEXT_SIZE):
-            tf.compat.v1.summary.image(
+            tf.summary.image(
                 "context_frame_%d" % (i + 1), context_frames, max_outputs=1
             )
-        tf.compat.v1.summary.image("target_images", labels, max_outputs=1)
-        tf.compat.v1.summary.image("target_means", mu_target, max_outputs=1)
-        tf.compat.v1.summary.scalar("l2_reconstruction", l2_reconstruction[1])
+        tf.summary.image("target_images", labels, max_outputs=1)
+        tf.summary.image("target_means", mu_target, max_outputs=1)
+        tf.summary.scalar("l2_reconstruction", l2_reconstruction[1])
         generator_sequence = debug_canvas_image_mean(
             [ep_gqn["canvas_{}".format(i)] for i in range(_SEQ_LENGTH)]
         )
-        tf.compat.v1.summary.image(
-            "generator_sequence_mean", generator_sequence, max_outputs=1
-        )
+        tf.summary.image("generator_sequence_mean", generator_sequence, max_outputs=1)
 
     # predictions to make when deployed during test time
     if mode == tf.estimator.ModeKeys.PREDICT:
@@ -317,10 +307,8 @@ def gqn_draw_identity_model_fn(features, labels, mode, params):
             mu_target, sigma_target, mu_q, sigma_q, mu_pi, sigma_pi, target_frame
         )
         if params["debug"]:
-            tf.compat.v1.summary.scalar(name="target_llh", tensor=ep_elbo["target_llh"])
-            tf.compat.v1.summary.scalar(
-                name="kl_regularizer", tensor=ep_elbo["kl_regularizer"]
-            )
+            tf.summary.scalar("target_llh", p_elbo["target_llh"])
+            tf.summary.scalar("kl_regularizer", ep_elbo["kl_regularizer"])
 
     # optimization
     if mode == tf.estimator.ModeKeys.TRAIN:
@@ -396,8 +384,8 @@ def gqn_vae_model_fn(features, labels, mode, params):
     target_sample = tf.identity(target_normal.sample(), name="target_sample")
     # write out image summaries in debug mode
     if params["debug"]:
-        tf.compat.v1.summary.image("target_images", labels, max_outputs=1)
-        tf.compat.v1.summary.image("target_sample", target_sample, max_outputs=1)
+        tf.summary.image("target_images", labels, max_outputs=1)
+        tf.summary.image("target_sample", target_sample, max_outputs=1)
 
     # predictions to make when deployed during test time
     if mode == tf.estimator.ModeKeys.PREDICT:

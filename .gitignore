@@ -114,3 +114,6 @@ cluster/
 data/
 models/
 tmp/
+
+# Deprecated directory
+deprecated/

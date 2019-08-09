@@ -11,6 +11,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import fnmatch
 import os
 import tensorflow as tf
 
@@ -87,8 +88,9 @@ def _get_dataset_files(dateset_info, mode, rootdir):
         mode_str = mode
 
     base = os.path.join(rootdir, basepath, mode_str)
+    files = sorted(fnmatch.filter(os.listdir(base), "*.tfrecord"))
 
-    return [os.path.join(base, f) for f in os.listdir(base)]
+    return [os.path.join(base, f) for f in files]
 
 
 def _convert_frame_data(jpeg_data):

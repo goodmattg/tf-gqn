@@ -29,6 +29,7 @@ data_reader = EagerDataReader(
     batch_size=BATCH_SIZE,
 )
 
+# Pull a single sample from the dataset
 sample = data_reader.dataset.take(1)
 
 for (features, labels) in sample:
