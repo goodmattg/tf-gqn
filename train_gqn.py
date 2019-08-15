@@ -95,7 +95,7 @@ ARGPARSER.add_argument(
 )
 # memory management
 ARGPARSER.add_argument(
-    "--batch_size", type=int, default=36, help="The number of data points per batch."
+    "--batch_size", type=int, default=4, help="The number of data points per batch."
 )
 ARGPARSER.add_argument(
     "--memcap",
@@ -206,6 +206,7 @@ def main(unparsed_argv):
             gqn_config._asdict(), ARGS.model_dir, config_name
         )  # save config to restore later
         print("Saved model config to %s" % (config_path,))
+
     model_params = {
         "gqn_params": gqn_config,
         "model_dir": ARGS.model_dir,
@@ -245,9 +246,6 @@ def main(unparsed_argv):
     if ARGS.initial_eval:
         print("Performing initial evaluation.")
         eval_results = model.evaluate(input_fn=eval_input, hooks=[logging_hook])
-        import pdb; pdb.set_trace()
-        
-    return
 
     # main loop
     for _ in range(ARGS.train_epochs):

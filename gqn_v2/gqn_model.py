@@ -90,6 +90,8 @@ def gqn_draw_model_fn(features, labels, mode, params) -> tf.estimator.EstimatorS
     context_frames = features.context.frames
     target_frame = labels
 
+    sigma_target = _linear_noise_annealing(params["gqn_params"])
+
     # graph setup
     net, ep_gqn = gqn_draw(
         query_pose=query_pose,
@@ -99,9 +101,9 @@ def gqn_draw_model_fn(features, labels, mode, params) -> tf.estimator.EstimatorS
         model_params=params["gqn_params"],
         is_training=(mode == tf.estimator.ModeKeys.TRAIN),
     )
+
     # outputs: mean images
     mu_target = net
-    sigma_target = _linear_noise_annealing(params["gqn_params"])
     # target_normal = tf.distributions.Normal(loc=mu_target, scale=sigma_target)
     # target_sample = tf.identity(target_normal.sample(), name='target_sample')
     if mode != tf.estimator.ModeKeys.PREDICT:
@@ -203,10 +205,8 @@ def gqn_draw_model_fn(features, labels, mode, params) -> tf.estimator.EstimatorS
     if mode == tf.estimator.ModeKeys.EVAL:
         estimator_spec = tf.estimator.EstimatorSpec(
             mode=mode,
-            # loss=elbo,
-            loss=tf.zeros(
-                1
-            ),  # dummy-loss, since generator is used and KL can't be computed
+            # dummy-loss, since generator is used and KL can't be computed
+            loss=tf.zeros(1),
             eval_metric_ops=eval_metric_ops,
             evaluation_hooks=eval_hooks,
         )
