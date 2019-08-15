@@ -133,6 +133,13 @@ ARGPARSER.add_argument(
     help="Runs an evaluation before the first training iteration.",
 )
 
+ARGPARSER.add_argument(
+    "--soft_train_pass",
+    default=False,
+    action="store_true",
+    help="Reduces training dataset to single batch for quick testing",
+)
+
 
 # ---------- helper functions ----------
 
@@ -236,6 +243,11 @@ def main(unparsed_argv):
     train_input = lambda: input_fn(estimator_mode=tf.estimator.ModeKeys.TRAIN)
     eval_input = lambda: input_fn(estimator_mode=tf.estimator.ModeKeys.EVAL)
 
+    if ARGS.soft_train_pass:
+        train_input = lambda: input_fn(estimator_mode=tf.estimator.ModeKeys.TRAIN).take(
+            1
+        )
+
     # create logging hooks
     tensors_to_log = {"l2_reconstruction": "l2_reconstruction"}
     logging_hook = tf.estimator.LoggingTensorHook(
@@ -251,7 +263,10 @@ def main(unparsed_argv):
     for _ in range(ARGS.train_epochs):
         print("Performing GQN training.")
         model.train(input_fn=train_input, hooks=[logging_hook])
-        eval_results = model.evaluate(input_fn=eval_input, hooks=[logging_hook])
+
+        # Evaluate if this is not a soft-training pass
+        if not ARGS.soft_train_pass:
+            eval_results = model.evaluate(input_fn=eval_input, hooks=[logging_hook])
 
 
 if __name__ == "__main__":

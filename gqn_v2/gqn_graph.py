@@ -110,6 +110,7 @@ def gqn_draw(
     dim_c_enc = model_params.ENC_CHANNELS
 
     with tf.compat.v1.variable_scope(scope):
+
         endpoints = {}
 
         enc_r, endpoints_enc = _encode_context(

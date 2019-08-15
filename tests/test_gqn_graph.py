@@ -5,15 +5,18 @@ toy data.
 
 import os
 import sys
+
 SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
-TF_GQN_HOME = os.path.abspath(os.path.join(SCRIPT_PATH, '..'))
-sys.path.append(TF_GQN_HOME)
+TF_GQN_ROOT = os.path.abspath(os.path.join(SCRIPT_PATH, ".."))
+
+sys.path.append(TF_GQN_ROOT)
 
 import tensorflow as tf
 import numpy as np
 
-from gqn.gqn_params import GQN_DEFAULT_CONFIG
-from gqn.gqn_graph import gqn_draw, gqn_vae
+from gqn_v2.gqn_params import GQN_DEFAULT_CONFIG
+from gqn_v2.gqn_graph import gqn_draw, gqn_vae
+from data_provider.gqn_provider import EagerDataReader
 
 # constants
 _BATCH_SIZE = 1
@@ -24,18 +27,30 @@ _DIM_W_IMG = GQN_DEFAULT_CONFIG.IMG_WIDTH
 _DIM_C_IMG = GQN_DEFAULT_CONFIG.IMG_CHANNELS
 _SEQ_LENGTH = GQN_DEFAULT_CONFIG.SEQ_LENGTH
 
-# input placeholders
-query_pose = tf.placeholder(
-    shape=[_BATCH_SIZE, _DIM_POSE], dtype=tf.float32)
-target_frame = tf.placeholder(
-    shape=[_BATCH_SIZE, _DIM_H_IMG, _DIM_W_IMG, _DIM_C_IMG],
-    dtype=tf.float32)
-context_poses = tf.placeholder(
-    shape=[_BATCH_SIZE, _CONTEXT_SIZE, _DIM_POSE],
-    dtype=tf.float32)
-context_frames = tf.placeholder(
-    shape=[_BATCH_SIZE, _CONTEXT_SIZE, _DIM_H_IMG, _DIM_W_IMG, _DIM_C_IMG],
-    dtype=tf.float32)
+# constants
+DATASET_ROOT_PATH = os.path.join(TF_GQN_ROOT, "data")
+DATASET_NAME = "rooms_ring_camera"
+CTX_SIZE = 5  # number of context (image, pose) pairs for a given query pose
+BATCH_SIZE = 1
+
+data_reader = EagerDataReader(
+    DATASET_ROOT_PATH,
+    DATASET_NAME,
+    CTX_SIZE,
+    mode=tf.estimator.ModeKeys.TRAIN,
+    batch_size=BATCH_SIZE,
+)
+
+# Pull a single sample from the dataset
+sample = data_reader.dataset.take(1)
+
+features, labels = next(sample.__iter__())
+
+# feed single batch input through the graph
+query_pose = features.query_camera
+target_frame = labels
+context_poses = features.context.cameras
+context_frames = features.context.frames
 
 # graph definition
 net, ep_gqn = gqn_draw(
@@ -44,34 +59,15 @@ net, ep_gqn = gqn_draw(
     context_poses=context_poses,
     context_frames=context_frames,
     model_params=GQN_DEFAULT_CONFIG,
-    is_training=True
+    is_training=True,
 )
 
-net_vae, ep_gqn_vae = gqn_vae(
-    query_pose=query_pose,
-    context_poses=context_poses,
-    context_frames=context_frames,
-    model_params=GQN_DEFAULT_CONFIG,
-)
+mu = net
 
-# feed random input through the graph
-with tf.Session() as sess:
-  sess.run(tf.global_variables_initializer())
-  [mu, mu_vae] = sess.run(
-      [net, net_vae],
-      feed_dict={
-          query_pose : np.random.rand(_BATCH_SIZE, _DIM_POSE),
-          target_frame : np.random.rand(_BATCH_SIZE, _DIM_H_IMG, _DIM_W_IMG, _DIM_C_IMG),
-          context_poses : np.random.rand(_BATCH_SIZE, _CONTEXT_SIZE, _DIM_POSE),
-          context_frames : np.random.rand(_BATCH_SIZE, _CONTEXT_SIZE, _DIM_H_IMG, _DIM_W_IMG, _DIM_C_IMG),
-      })
-  print(mu, mu_vae)
-  print(mu.shape, mu_vae.shape)
+print(mu)
+print(mu.shape)
 
-  for ep, t in ep_gqn.items():
-    print(ep, t)
-
-  for ep, t in ep_gqn_vae.items():
-    print(ep, t)
+for ep, t in ep_gqn.items():
+    print(ep, t.shape)
 
 print("TEST PASSED!")

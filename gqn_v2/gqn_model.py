@@ -93,7 +93,8 @@ def gqn_draw_model_fn(features, labels, mode, params) -> tf.estimator.EstimatorS
     sigma_target = _linear_noise_annealing(params["gqn_params"])
 
     # graph setup
-    net, ep_gqn = gqn_draw(
+    # outputs: mean_images, pointer to key Tensors
+    mu_target, ep_gqn = gqn_draw(
         query_pose=query_pose,
         target_frame=target_frame,
         context_poses=context_poses,
@@ -102,8 +103,6 @@ def gqn_draw_model_fn(features, labels, mode, params) -> tf.estimator.EstimatorS
         is_training=(mode == tf.estimator.ModeKeys.TRAIN),
     )
 
-    # outputs: mean images
-    mu_target = net
     # target_normal = tf.distributions.Normal(loc=mu_target, scale=sigma_target)
     # target_sample = tf.identity(target_normal.sample(), name='target_sample')
     if mode != tf.estimator.ModeKeys.PREDICT:
@@ -132,6 +131,7 @@ def gqn_draw_model_fn(features, labels, mode, params) -> tf.estimator.EstimatorS
         )
         # target images
         tf.summary.image("target_frame", target_frame, max_outputs=1)
+
         # show inference results during training phase
         if mode == tf.estimator.ModeKeys.TRAIN:
             tf.summary.scalar("l2_reconstruction_train", l2_reconstruction[1])
@@ -152,7 +152,7 @@ def gqn_draw_model_fn(features, labels, mode, params) -> tf.estimator.EstimatorS
             "scenario_name": features.meta.scenario_name,
             "query_pose": query_pose,
             "target_prediction": mu_target,
-            # 'target_image' : features.target,
+            "target_image": features.target,
         }
 
     # ELBO setup
@@ -164,6 +164,7 @@ def gqn_draw_model_fn(features, labels, mode, params) -> tf.estimator.EstimatorS
             sigma_q.append(ep_gqn["sigma_q_%d" % i])
             mu_pi.append(ep_gqn["mu_pi_%d" % i])
             sigma_pi.append(ep_gqn["sigma_pi_%d" % i])
+
         elbo, ep_elbo = gqn_draw_elbo(
             mu_target, sigma_target, mu_q, sigma_q, mu_pi, sigma_pi, target_frame
         )
@@ -202,6 +203,7 @@ def gqn_draw_model_fn(features, labels, mode, params) -> tf.estimator.EstimatorS
         estimator_spec = tf.estimator.EstimatorSpec(
             mode=mode, loss=elbo, train_op=train_op
         )
+
     if mode == tf.estimator.ModeKeys.EVAL:
         estimator_spec = tf.estimator.EstimatorSpec(
             mode=mode,
@@ -210,6 +212,7 @@ def gqn_draw_model_fn(features, labels, mode, params) -> tf.estimator.EstimatorS
             eval_metric_ops=eval_metric_ops,
             evaluation_hooks=eval_hooks,
         )
+
     if mode == tf.estimator.ModeKeys.PREDICT:
         estimator_spec = tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
 
